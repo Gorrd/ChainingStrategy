@@ -1,0 +1,6 @@
+- Clean up translation functions
+- Implement LOST state (conditions 4,5,6)
+- Implement condition 3 (merge two chain members too close)
+- Look for implement multiple .lua files
+- Look for an output file for logs
+- Implement exploration walk among the chain
