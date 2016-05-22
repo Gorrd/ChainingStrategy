@@ -33,5 +33,7 @@ A state machine allows to decouple a complex problem into simpler instances, who
 ## Technical information
 
 **landmarks.argos** The XML configuration file
+
 **src** A directory that contains the loop functions (i.e., the logic to gather the data) in source format.
+
 **build** The loop functions compilated and ready to be used by the configuration file
