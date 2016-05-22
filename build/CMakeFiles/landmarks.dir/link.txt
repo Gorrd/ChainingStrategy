@@ -1,0 +1,1 @@
+/usr/bin/c++  -fPIC   -shared -Wl,-soname,liblandmarks.so -o liblandmarks.so CMakeFiles/landmarks.dir/landmarks.cpp.o  -L/usr/local/lib/argos3 -largos3core_simulator -llua5.2 -lm -largos3plugin_simulator_footbot -Wl,-rpath,/usr/local/lib/argos3 
