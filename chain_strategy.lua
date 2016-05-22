@@ -1,36 +1,42 @@
 --[[ Chaining Strategy
-
+The robots are initially placed in an area that we call the nest. The goal is to form five chains that 
+connect the nest with the target locations. The experiment is automatically spotted when there is a robot
+in each location.
 ]]
 
+------------------------------------------------------------------------------------------------------
+--														GLOBAL VARIABLES
+------------------------------------------------------------------------------------------------------
 -- States
-
 -- EXPLORER states
-EXPLORER = 1
 -- Move around the nest searching for chains, then navigates along a chain to explore the environment.
+EXPLORER = 1
 EXPLORER_FWD = 11 -- The robot moves along a chain the direction away from the nest
 EXPLORER_BWD = 12  -- The robot moves along a chain the direction back toward the nest
 
 -- CHAIN_MEMBER states
-CHAIN_MEMBER = 2
 -- Activates when a robot is aggregated into a chain.
+CHAIN_MEMBER = 2
 CHAIN_MEMBER_LAST = 21 -- The robot is the last member of its chain
 CHAIN_MEMBER_NOT_LAST = 22 -- The robot is not the last member of its chain
 
--- The robots are all initialized in this state
+-- The robots are all initialized in this state to explore the nest
 current_state = EXPLORER
 current_substate = EXPLORER_FWD
 
--- Probabilities
+-- Probabilities of some state's transition
 p_expl_chain = 0.01 -- Exploration -> Chain member
 p_chain_expl = 0.1 -- Chain member -> Exploration
 
--- Colors
+-- Colors to give information about the robot's location in the chain
 NONE = 0
 BLUE = 1
 GREEN = 2
 RED = 3
 current_color = 0
 
+------------------------------------------------------------------------------------------------------
+--														HELPFUL FUNCTIONS
 ------------------------------------------------------------------------------------------------------
 
 -- function used to copy two tables
@@ -49,21 +55,26 @@ function round(num, idp)
 end
 
 ------------------------------------------------------------------------------------------------------
+--															MAIN PROGRAM
+------------------------------------------------------------------------------------------------------
 
 function init()
 	current_state = EXPLORER
 	current_substate = EXPLORER_FWD
-	current_color = 0
+	current_color = NONE
 	emit_data()
 	robot.in_chain = 0
 end
 
-
 function step()
 
+	-- Emission of the several data
 	emit_data()
+
+	-- Writting in logs
 	write_logs()
 
+	-- Main loop
 	if current_state == EXPLORER then
 		explorer_behavior()
 	
@@ -73,25 +84,93 @@ function step()
 
 end
 
-
+-- Should be the same as init
 function reset()
 	current_state = EXPLORER
 	current_substate = EXPLORER_FWD
-	current_color = 0
+	current_color = NONE
 	emit_data()
 	robot.in_chain = 0
 end
-
 
 function destroy()
 end
 
 ------------------------------------------------------------------------------------------------------
+-- 														LOGS FUNCTIONS
+------------------------------------------------------------------------------------------------------
+
+-- Writing in the logs
+function write_logs()
+	log("Robot ID : "..robot.id)
+	log("State : "..current_substate_word())
+	log("Explorers robots detected : "..robot_detected(EXPLORER))
+	log("Chain members robots detected : "..robot_detected(CHAIN_MEMBER))
+	log("Lost robots detected : "..robot_detected(LOST))
+	robot_detected_logs()
+	log("-------------------------------")
+end
+
+-- Write useful informations about detected robots
+function robot_detected_logs()
+	sort_data = table.copy(robot.range_and_bearing)
+	table.sort(sort_data, function(a,b) return a.range<b.range end)
+	for i = 1,#robot.range_and_bearing do
+		log(
+		sort_data[i].data[3]," - ", 
+		number_state(sort_data[i].data[1])," - ",
+		number_color(sort_data[i].data[2])," - ",
+		sort_data[i].range
+		)
+	end
+end
+
+------------------------------------------------------------------------------------------------------
+-- 													TRANSLATION FUNCTIONS
+------------------------------------------------------------------------------------------------------
+
+-- Translate the current substate into word
+function current_substate_word()
+	if current_substate == EXPLORER_FWD then
+		return "EXPLORER_FWD"
+	elseif current_substate == EXPLORER_BWD then
+		return "EXPLORER_BWD"
+	elseif current_substate == CHAIN_MEMBER_LAST then
+		return "CHAIN_MEMBER_LAST"
+	elseif current_substate == CHAIN_MEMBER_NOT_LAST then
+		return "CHAIN_MEMBER_NOT_LAST"
+	end
+end
+
+-- Translate the parameter state into word
+function number_state(state)
+	if state == EXPLORER then
+		return "EXPLORER"
+	elseif state == CHAIN_MEMBER then
+		return "CHAIN_MEMBER"
+	end
+end
+
+-- Translate the parameter color into word
+function number_color(color)
+	if color == NONE then
+		return "NONE"
+	elseif color == BLUE then
+		return "BLUE"
+	elseif color == GREEN then
+		return "GREEN"
+	elseif color == RED then
+		return "RED"
+	end
+end
+
+------------------------------------------------------------------------------------------------------
+-- 													BEHAVIOR FUNCTIONS
+------------------------------------------------------------------------------------------------------
 
 -- What the robot does when it is explorating his environment
 function explorer_behavior()
 	robot.leds.set_all_colors("white")
-	explore()
 
 	-- Start condition : robot is on nest, no chain detected
 	-- Time create a new chain !
@@ -112,10 +191,17 @@ function explorer_behavior()
 		current_substate = CHAIN_MEMBER_LAST
 		set_color_chain()
 
+	-- The explorer senses two chain members or more. It will follow one chain member based on his substate.
+	elseif robot_detected(CHAIN_MEMBER) >= 2 then
+		move_along_chain()
+
 	-- The backward explorer founds the nest and is ready to go on
 	elseif current_substate == EXPLORER_BWD
 	and isOnNest() then
 		current_substate = EXPLORER_FWD
+	
+	else
+		explore()
 	end
 end
 
@@ -145,33 +231,14 @@ function chain_member_behavior()
 end
 
 ------------------------------------------------------------------------------------------------------
+-- 												RANGE AND BEARING FUNCTIONS
+------------------------------------------------------------------------------------------------------
 
--- The robot emits his state (= 1) and his color (= 2)
+-- The robot emits his state (= 1) and his color (= 2) and his ID (= 3)
 function emit_data()
 	robot.range_and_bearing.set_data(1,current_state)
 	robot.range_and_bearing.set_data(2,current_color)
-end
-
--- Writing in the logs
-function write_logs()
-	log("Robot ID : "..robot.id)
-	log("State : "..current_substate_word())
-	log("Explorers robots detected : "..robot_detected(EXPLORER))
-	log("Chain members robots detected : "..robot_detected(CHAIN_MEMBER))
-	log("Lost robots detected : "..robot_detected(LOST))
-	log("-------------------------------")
-end
-
-function current_substate_word()
-	if current_substate == EXPLORER_FWD then
-		return "EXPLORER_FWD"
-	elseif current_substate == EXPLORER_BWD then
-		return "EXPLORER_BWD"
-	elseif current_substate == CHAIN_MEMBER_LAST then
-		return "CHAIN_MEMBER_LAST"
-	elseif current_substate == CHAIN_MEMBER_NOT_LAST then
-		return "CHAIN_MEMBER_NOT_LAST"
-	end
+	robot.range_and_bearing.set_data(3,tonumber(string.match(robot.id, "[0-9]+")))
 end
 
 -- Set the color (position) of the robot in the chain. Called only when one robot is sensed !!
@@ -243,6 +310,14 @@ function next_chain_color_detected()
 		end
 	end
 	return false
+end
+
+------------------------------------------------------------------------------------------------------
+
+-- LOLILOL
+function move_along_chain()
+	-- First : find the two closest chain members. We need color
+	explore()
 end
 
 function explore()
