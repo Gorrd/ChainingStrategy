@@ -28,4 +28,10 @@ form of collective memory.
 
 ## Design pattern : State machine
 
-A state machine allows o decouple a complex problem into simpler instances, whose solution is easier to develop. I use the design of Shervin NOYAN, explained in his report (http://www.swarm-bots.org/dllink.php@id=448&type=documents).
+A state machine allows to decouple a complex problem into simpler instances, whose solution is easier to develop. I use the design of Shervin NOYAN, explained in his report (http://www.swarm-bots.org/dllink.php@id=448&type=documents).
+
+## Technical information
+
+**landmarks.argos** The XML configuration file
+**src** A directory that contains the loop functions (i.e., the logic to gather the data) in source format.
+**build** The loop functions compilated and ready to be used by the configuration file
