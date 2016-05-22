@@ -7,6 +7,7 @@ in each location.
 ------------------------------------------------------------------------------------------------------
 --														GLOBAL VARIABLES
 ------------------------------------------------------------------------------------------------------
+
 -- States
 -- EXPLORER states
 -- Move around the nest searching for chains, then navigates along a chain to explore the environment.
@@ -113,7 +114,7 @@ end
 
 -- Write useful informations about detected robots
 function robot_detected_logs()
-	sort_data = table.copy(robot.range_and_bearing)
+	local sort_data = table.copy(robot.range_and_bearing)
 	table.sort(sort_data, function(a,b) return a.range<b.range end)
 	for i = 1,#robot.range_and_bearing do
 		log(
@@ -186,7 +187,8 @@ function explorer_behavior()
 		current_substate = CHAIN_MEMBER_LAST
 		set_color_chain()
 
-	-- The explorer senses two chain members or more. It will follow one chain member based on his substate.
+	-- The explorer senses two chain members or more. It will follow one chain member based on his substate until
+	-- it detects only one chain member.
 	elseif robot_detected(CHAIN_MEMBER) >= 2 then
 		move_along_chain()
 
@@ -263,7 +265,7 @@ end
 
 -- Return how many robots with the parameter state
 function robot_detected(state)
-	number_robot_sensed = 0
+	local number_robot_sensed = 0
 
 	for i = 1,#robot.range_and_bearing do
 		if robot.range_and_bearing[i].range < 150 and robot.range_and_bearing[i].data[1] == state then
@@ -273,9 +275,9 @@ function robot_detected(state)
 	return number_robot_sensed
 end
 
--- Sense the nest
+-- Sense if the robot is on the nest based on the color's floor
 function isOnNest()
-	sort_ground = table.copy(robot.motor_ground)
+	local sort_ground = table.copy(robot.motor_ground)
    table.sort(sort_ground, function(a,b) return a.value<b.value end)
 	if round(sort_ground[1].value,2) == 0.9 then
 		return true
@@ -307,11 +309,61 @@ function next_chain_color_detected()
 	return false
 end
 
+-- Find the two closest chain members and return their colors. Dont need to check if there is at least 
+-- two chain members detected
+function two_closest_chain_members()
+	local sort_data = table.copy(robot.range_and_bearing)
+	local colors = {color1 = NONE, color2 = NONE}
+	table.sort(sort_data, function(a,b) return a.range<b.range end)
+	local count = 0
+	for i = 1,#robot.range_and_bearing do
+		if sort_data[i].data[1] == CHAIN_MEMBER then -- Chain member found
+			if count == 0 then
+				colors.color1 = sort_data[i].data[2]
+				count = count + 1
+			elseif count == 1 then
+				colors.color2 = sort_data[i].data[2]
+				count = count + 1
+				break
+			end
+		end
+	end
+	return colors
+end
+
 ------------------------------------------------------------------------------------------------------
 
 -- LOLILOL
 function move_along_chain()
-	-- First : find the two closest chain members. We need color
+	colors = two_closest_chain_members() -- colors of the two closest chain members
+	member_chosen = NONE
+
+	if colors.color1 == colors.color2 then
+		member_chosen = colors.color1
+
+	elseif  (colors == {color1 = BLUE,color2 = GREEN} or colors == {color1 = GREEN,color2 = BLUE}) 
+	and current_substate == EXPLORER_FWD then
+		member_chosen = GREEN
+	elseif  (colors == {color1 = BLUE,color2 = GREEN} or colors == {color1 = GREEN,color2 = BLUE}) 
+	and current_substate == EXPLORER_BWD then
+		member_chosen = BLUE
+
+	elseif  (colors == {color1 = GREEN,color2 = RED} or colors == {color1 = RED,color2 = GREEN}) 
+	and current_substate == EXPLORER_FWD then
+		member_chosen = RED
+	elseif  (colors == {color1 = GREEN,color2 = RED} or colors == {color1 = RED,color2 = GREEN})
+   and current_substate == EXPLORER_BWD then
+		member_chosen = GREEN
+
+	elseif  (colors == {color1 = RED,color2 = BLUE} or colors == {color1 = BLUE,color2 = RED}) 
+	and current_substate == EXPLORER_FWD then
+		member_chosen = BLUE
+	elseif  (colors == {color1 = RED,color2 = BLUE} or colors == {color1 = BLUE,color2 = RED}) 
+	and current_substate == EXPLORER_BWD then
+		member_chosen = RED
+	end
+
+	log("Member chosen :"..number_color(member_chosen))
 	explore()
 end
 
