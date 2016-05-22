@@ -103,7 +103,7 @@ end
 -- Writing in the logs
 function write_logs()
 	log("Robot ID : "..robot.id)
-	log("State : "..current_substate_word())
+	log("State : "..number_state(current_substate))
 	log("Explorers robots detected : "..robot_detected(EXPLORER))
 	log("Chain members robots detected : "..robot_detected(CHAIN_MEMBER))
 	log("Lost robots detected : "..robot_detected(LOST))
@@ -129,22 +129,17 @@ end
 -- 													TRANSLATION FUNCTIONS
 ------------------------------------------------------------------------------------------------------
 
--- Translate the current substate into word
-function current_substate_word()
-	if current_substate == EXPLORER_FWD then
-		return "EXPLORER_FWD"
-	elseif current_substate == EXPLORER_BWD then
-		return "EXPLORER_BWD"
-	elseif current_substate == CHAIN_MEMBER_LAST then
-		return "CHAIN_MEMBER_LAST"
-	elseif current_substate == CHAIN_MEMBER_NOT_LAST then
-		return "CHAIN_MEMBER_NOT_LAST"
-	end
-end
-
 -- Translate the parameter state into word
 function number_state(state)
-	if state == EXPLORER then
+	if state == EXPLORER_FWD then
+		return "EXPLORER_FWD"
+	elseif state == EXPLORER_BWD then
+		return "EXPLORER_BWD"
+	elseif state == CHAIN_MEMBER_LAST then
+		return "CHAIN_MEMBER_LAST"
+	elseif state == CHAIN_MEMBER_NOT_LAST then
+		return "CHAIN_MEMBER_NOT_LAST"
+	elseif state == EXPLORER then
 		return "EXPLORER"
 	elseif state == CHAIN_MEMBER then
 		return "CHAIN_MEMBER"
