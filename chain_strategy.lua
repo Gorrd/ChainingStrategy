@@ -26,10 +26,11 @@ current_substate = EXPLORER_FWD
 
 -- Probabilities of some state's transition
 p_expl_chain = 0.01 -- Exploration -> Chain member
-p_chain_expl = 1 - p_expl_chain -- Chain member -> Exploration
+p_chain_expl = 0 -- Chain member -> Exploration
 
 -- Count how many steps left for the robot's transition
 current_transition_steps = -1
+long_range_steps = 0
 
 -- Colors to give information about the robot's location in the chain
 NONE = 0
@@ -42,6 +43,8 @@ current_color = 0
 d_expl = 15 -- desired distance between an explorer and his chosen chain-member
 d_camera = 150 -- camera sensing range
 d_merge = 3 -- distance threshold for two chain-members to merge into one
+d_chain = 120 -- -- the target distance between robots, in cm
+EPSILON = 50 -- a coefficient to increase the force of the repulsion/attraction function
 
 ------------------------------------------------------------------------------------------------------
 --										    HELPFUL FUNCTIONS
@@ -66,6 +69,7 @@ end
 local range_and_bearing = require("range_and_bearing")
 local logs = require("logs")
 local explorer = require("explorer")
+local chain_member = require("chain_member")
 
 ------------------------------------------------------------------------------------------------------
 --										    MAIN PROGRAM
@@ -78,6 +82,8 @@ function init()
 	range_and_bearing.emit_data()
 	robot.in_chain = 0
 	robot.distance_scanner.enable()
+	current_transition_steps = -1
+    long_range_steps = 0
 end
 
 function step()
@@ -95,8 +101,8 @@ function step()
 	if current_state == EXPLORER then
 		explorer.behavior()
 	   
-	--elseif current_state == CHAIN_MEMBER then
-	--	chain_member_behavior()
+	elseif current_state == CHAIN_MEMBER then
+	    chain_member.behavior()
 	end
 
 end
@@ -109,6 +115,8 @@ function reset()
 	range_and_bearing.emit_data()
 	robot.in_chain = 0
 	robot.distance_scanner.enable()
+	current_transition_steps = -1
+    long_range_steps = 0
 end
 
 function destroy()

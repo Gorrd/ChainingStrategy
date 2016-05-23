@@ -53,7 +53,7 @@ end
 
 -- Detect if the next color of the chain is detected
 function range_and_bearing.next_chain_color_detected()
-	for i = 1,#robot.range_and_bearing do
+--[[	for i = 1,#robot.range_and_bearing do
 
 		if robot.range_and_bearing[i].range < 150 
 		and current_color == BLUE
@@ -71,16 +71,92 @@ function range_and_bearing.next_chain_color_detected()
 			return true
 		end
 	end
+]]	return false
+end
+
+-- Detect if the previous color of the chain is detected
+function range_and_bearing.previous_chain_color_detected()
+	for i = 1,#robot.range_and_bearing do
+
+		if robot.range_and_bearing[i].range < 150 
+		and current_color == BLUE
+		and robot.range_and_bearing[i].data[2] == RED then
+			return true
+
+		elseif robot.range_and_bearing[i].range < 150 
+		and current_color == GREEN
+		and robot.range_and_bearing[i].data[2] == BLUE then
+			return true
+
+		elseif robot.range_and_bearing[i].range < 150 
+		and current_color == RED
+		and robot.range_and_bearing[i].data[2] == GREEN then
+			return true
+		end
+	end
 	return false
+end
+
+-- Find the previous chain member and return his informations.
+function range_and_bearing.previous_chain_member()
+	local sort_data = table.copy(robot.range_and_bearing)
+	local info = { d = 0, angle = 0 }
+	local previous_color = NONE
+	table.sort(sort_data, function(a,b) return a.range<b.range end)
+	
+	-- Find the color of the previous member based on the current color
+	if current_color == BLUE then
+	    previous_color = RED
+	elseif current_color == GREEN then
+	    previous_color = BLUE
+	elseif current_color == RED then
+	    previous_color = GREEN
+	end
+	
+	for i = 1,#robot.range_and_bearing do
+		if sort_data[i].data[1] == CHAIN_MEMBER and sort_data[i].data[2] == previous_color then -- previous chain member found
+		    info.d = sort_data[i].range
+		    info.angle = sort_data[i].horizontal_bearing
+		end
+	end
+	
+	return info
+end
+
+-- Find the next chain member and return his informations.
+function range_and_bearing.next_chain_member()
+	local sort_data = table.copy(robot.range_and_bearing)
+	local info = { d = 0, angle = 0 }
+	local next_color = NONE
+	table.sort(sort_data, function(a,b) return a.range<b.range end)
+	
+	-- Find the color of the next member based on the current color
+	if current_color == BLUE then
+	    next_color = GREEN
+	elseif current_color == GREEN then
+	    next_color = RED
+	elseif current_color == RED then
+	    next_color = BLUE
+	end
+	
+	for i = 1,#robot.range_and_bearing do
+		if sort_data[i].data[1] == CHAIN_MEMBER and sort_data[i].data[2] == next_color then -- next chain member found
+		    info.d = sort_data[i].range
+		    info.angle = sort_data[i].horizontal_bearing
+		end
+	end
+	
+	return info
 end
 
 -- Find the two closest chain members and return their informations. Doesnt need to check if there is at least 
 -- two chain members detected
-function two_closest_chain_members()
+function range_and_bearing.two_closest_chain_members()
 	local sort_data = table.copy(robot.range_and_bearing)
 	local info = {color1 = NONE, color2 = NONE, d1 = 0, d2 = 0, angle1 = 0, angle2 = 0}
 	table.sort(sort_data, function(a,b) return a.range<b.range end)
 	local count = 0
+	
 	for i = 1,#robot.range_and_bearing do
 		if sort_data[i].data[1] == CHAIN_MEMBER then -- Chain member found
 			if count == 0 then
@@ -97,6 +173,7 @@ function two_closest_chain_members()
 			end
 		end
 	end
+	
 	return info
 end
 

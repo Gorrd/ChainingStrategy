@@ -38,13 +38,6 @@ function explorer.behavior()
 		current_substate = CHAIN_MEMBER_LAST
 		range_and_bearing.set_color_chain()
 
-	-- The explorer senses one chain member and is on the nest.
-	-- It will follow it until it founds two chain members.
-	elseif current_substate == EXPLORER_FWD
-	and range_and_bearing.robot_detected(CHAIN_MEMBER) == 1
-	and explorer.isOnNest() then
-		explorer.explore()
-
 	-- The explorer senses two chain members or more. It will follow one chain member based on his substate until
 	-- it detects only one chain member.
 	elseif range_and_bearing.robot_detected(CHAIN_MEMBER) >= 2 then
@@ -107,38 +100,94 @@ function explorer.move_along_chain()
 
 	end
 
-	f_ad = { x=0, y=0 }
-	f_ad.x = (d_expl-member_chosen.distance) / d_camera  * math.cos(member_chosen.angle)
-	f_ad.y = (d_expl-member_chosen.distance) / d_camera  * math.sin(member_chosen.angle)
+    -- Adjust distance
+	F_ad = { x=0, y=0 }
+	F_ad.x = (d_expl-member_chosen.distance) / d_camera  * math.cos(member_chosen.angle)
+	F_ad.y = (d_expl-member_chosen.distance) / d_camera  * math.sin(member_chosen.angle)
+	
+	-- Move perpendicular
+	F_mp = { x=0, y=0 }
+	F_mp.x = - math.sin(member_chosen.angle)
+    F_mp.y = math.cos(member_chosen.angle)
+    
+    -- Avoid collisions
+    F_ac = { x=0, y=0 }
+    for i = 1, 24 do 
+        vec = {
+			x = robot.proximity[i].value * math.cos(robot.proximity[i].angle),
+			y = robot.proximity[i].value * math.sin(robot.proximity[i].angle)
+		}
+		F_ac.x = F_ac.x + vec.x
+		F_ac.y = F_ac.y + vec.y
+	end
+    
+	F_expl = { x=0, y=0 }
+	F_expl.x = 5*F_ad.x + F_mp.x + F_ac.x
+	F_expl.y = 5*F_ad.y + F_mp.y + F_ac.y
 
-	f_expl = { x=0, y=0 }
-	f_expl.x = f_ad.x
-	f_expl.y = f_ad.y
-
-	length = math.sqrt(f_expl.x * f_expl.x + f_expl.y * f_expl.y)
-	angle = math.atan2(f_expl.y, f_expl.x)
-
-	log("Final vector")
-	log("Length: "..length)
-	log("Angle: "..angle)
-
-	explorer.explore()
+	length = math.sqrt(F_expl.x * F_expl.x + F_expl.y * F_expl.y)
+	angle = math.atan2(F_expl.y, F_expl.x)
+	
+	-- Low level motor control
+	lSpeed = 0
+	rSpeed = 0
+	
+	if angle >= 0 and angle < math.pi/2 then
+	    lSpeed = math.cos(2*angle)
+	    rSpeed = 10
+	elseif angle >= math.pi/2 and angle < math.pi then
+		lSpeed = math.cos(2*angle - math.pi)
+	    rSpeed = -10
+	elseif angle >= math.pi and angle < 3*math.pi/2 then
+		lSpeed = -10
+	    rSpeed = - math.cos(2*angle)
+	elseif angle >= 3*math.pi/2 and angle < 2*math.pi then
+		lSpeed = 10
+	    rSpeed = - math.cos(2*angle - math.pi)
+	else
+	    lSpeed = 10
+	    rSpeed = 10
+	end
+	
+	robot.wheels.set_velocity(math.min(length,10)*lSpeed,math.min(length,10)*rSpeed)
 end
 
 function explorer.explore()
 
-	-- Long range
+	-- Long range scanner. Because of the robot's movement, we need to correct direction
+	-- only 5 steps otherwise the robot will adjust his direction each step.
 	accumul = { x=0, y=0 }
-	local data = table.copy(robot.distance_scanner.long_range)
-    for i=1,#robot.distance_scanner.long_range do
-		local vec = {
-			x = data[i].distance * math.cos(data[i].angle),
-			y = data[i].distance * math.sin(data[i].angle)
+	
+	if long_range_steps == 0 then
+	    local data = table.copy(robot.distance_scanner.long_range)
+        for i=1,#robot.distance_scanner.long_range do
+		    local vec = {
+			    x = data[i].distance * math.cos(data[i].angle),
+			    y = data[i].distance * math.sin(data[i].angle)
+		    }
+		    accumul.x = accumul.x + vec.x
+		    accumul.y = accumul.y + vec.y
+        end
+    end
+    
+    long_range_steps = long_range_steps + 1
+    if long_range_steps == 5 then
+        long_range_steps = 0
+    end
+    
+    -- Short range is about the proximity sensor
+    for i = 1, 24 do 
+		vec = {
+			x = robot.proximity[i].value * math.cos(robot.proximity[i].angle),
+			y = robot.proximity[i].value * math.sin(robot.proximity[i].angle)
 		}
+
 		accumul.x = accumul.x + vec.x
 		accumul.y = accumul.y + vec.y
-    end
-
+	end
+    
+    
+    -- Length and angle of the final vector
 	length = math.sqrt(accumul.x * accumul.x + accumul.y * accumul.y)
 	angle = math.atan2(accumul.y, accumul.x)
 
