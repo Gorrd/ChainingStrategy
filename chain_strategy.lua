@@ -27,7 +27,9 @@ current_substate = EXPLORER_FWD
 
 -- Probabilities of some state's transition
 p_expl_chain = 0.01 -- Exploration -> Chain member
-p_chain_expl = 0.1 -- Chain member -> Exploration
+p_chain_expl = 1 - p_expl_chain -- Chain member -> Exploration
+
+current_transition_steps = -1
 
 -- Colors to give information about the robot's location in the chain
 NONE = 0
@@ -35,6 +37,11 @@ BLUE = 1
 GREEN = 2
 RED = 3
 current_color = 0
+
+-- Distances
+d_expl = 15 -- desired distance between an explorer and his chosen chain-member
+d_camera = 150 -- camera sensing range
+d_merge = 3 -- distance threshold for two chain-members to merge into one
 
 ------------------------------------------------------------------------------------------------------
 --														HELPFUL FUNCTIONS
@@ -65,9 +72,14 @@ function init()
 	current_color = NONE
 	emit_data()
 	robot.in_chain = 0
+	robot.distance_scanner.enable()
+	
 end
 
 function step()
+
+	-- Distance scanner rotation
+	robot.distance_scanner.set_rpm(30/math.pi)
 
 	-- Emission of the several data
 	emit_data()
@@ -92,6 +104,7 @@ function reset()
 	current_color = NONE
 	emit_data()
 	robot.in_chain = 0
+		robot.distance_scanner.enable()
 end
 
 function destroy()
@@ -168,24 +181,40 @@ end
 function explorer_behavior()
 	robot.leds.set_all_colors("white")
 
-	-- Start condition : robot is on nest, no chain detected
+	-- Start condition : robot is not on nest, no chain detected
 	-- Time create a new chain !
+	-- Delay is added to prevent the chain to start too close from the nest
 	if current_substate == EXPLORER_FWD
-	and isOnNest()
-	and robot_detected(CHAIN_MEMBER) == 0
-	and robot.random.bernoulli(p_expl_chain) == 1 then
+	and not(isOnNest())
+	and robot_detected(CHAIN_MEMBER) == 0 then
+		if current_transition_steps == -1 then
+			current_transition_steps = robot.random.uniform_int(10,30)
+		end
+		if current_transition_steps == 0 then
+			current_state = CHAIN_MEMBER
+			current_substate = CHAIN_MEMBER_LAST
+			set_color_chain()
+			current_transition_steps = -1
+		else
+			current_transition_steps = current_transition_steps - 1
+		end
+
+	-- The explorer senses one chain member and is not on the nest. 
+	-- A probabilistic event will trigger the aggregation of the robot to the chain.
+	elseif current_substate == EXPLORER_FWD
+	and robot_detected(CHAIN_MEMBER) == 1
+	and robot.random.bernoulli(p_expl_chain) == 1 
+	and not(isOnNest()) then
 		current_state = CHAIN_MEMBER
 		current_substate = CHAIN_MEMBER_LAST
 		set_color_chain()
 
-	-- The explorer senses one chain member. A probabilistic event will trigger the aggregation
-	-- of the robot to the chain.
+	-- The explorer senses one chain member and is on the nest.
+	-- It will follow it until it founds two chain members.
 	elseif current_substate == EXPLORER_FWD
 	and robot_detected(CHAIN_MEMBER) == 1
-	and robot.random.bernoulli(p_expl_chain) == 1 then
-		current_state = CHAIN_MEMBER
-		current_substate = CHAIN_MEMBER_LAST
-		set_color_chain()
+	and isOnNest() then
+		explore()
 
 	-- The explorer senses two chain members or more. It will follow one chain member based on his substate until
 	-- it detects only one chain member.
@@ -196,7 +225,8 @@ function explorer_behavior()
 	elseif current_substate == EXPLORER_BWD
 	and isOnNest() then
 		current_substate = EXPLORER_FWD
-	
+
+	-- The robot explores
 	else
 		explore()
 	end
@@ -309,80 +339,112 @@ function next_chain_color_detected()
 	return false
 end
 
--- Find the two closest chain members and return their colors. Dont need to check if there is at least 
+-- Find the two closest chain members and return their informations. Dont need to check if there is at least 
 -- two chain members detected
 function two_closest_chain_members()
 	local sort_data = table.copy(robot.range_and_bearing)
-	local colors = {color1 = NONE, color2 = NONE}
+	local info = {color1 = NONE, color2 = NONE, d1 = 0, d2 = 0, angle1 = 0, angle2 = 0}
 	table.sort(sort_data, function(a,b) return a.range<b.range end)
 	local count = 0
 	for i = 1,#robot.range_and_bearing do
 		if sort_data[i].data[1] == CHAIN_MEMBER then -- Chain member found
 			if count == 0 then
-				colors.color1 = sort_data[i].data[2]
+				info.color1 = sort_data[i].data[2]
+				info.d1 = sort_data[i].range
+				info.angle1 = sort_data[i].horizontal_bearing
 				count = count + 1
 			elseif count == 1 then
-				colors.color2 = sort_data[i].data[2]
+				info.color2 = sort_data[i].data[2]
+				info.d2 = sort_data[i].range
+				info.angle2 = sort_data[i].horizontal_bearing
 				count = count + 1
 				break
 			end
 		end
 	end
-	return colors
+	return info
 end
 
 ------------------------------------------------------------------------------------------------------
 
--- LOLILOL
+-- The explorer moves along the chain he found.
 function move_along_chain()
-	colors = two_closest_chain_members() -- colors of the two closest chain members
-	member_chosen = NONE
+	
+	-- Selection of the chain member to follow
+	info = two_closest_chain_members() -- Informations of the two closest chain members
+	member_chosen = {color=NONE, distance=0, angle=0}
 
-	if colors.color1 == colors.color2 then
-		member_chosen = colors.color1
+	if info.color1 == info.color2 then
+		member_chosen.color = info.color1 
+		member_chosen.distance = info.d1 
+		member_chosen.angle = info.angle1
+	end
+	
+	if info.color1 == BLUE and info.color2 == GREEN
+	or info.color1 == GREEN and info.color2 == RED
+	or info.color1 == RED and info.color2 == BLUE then
 
-	elseif  (colors == {color1 = BLUE,color2 = GREEN} or colors == {color1 = GREEN,color2 = BLUE}) 
-	and current_substate == EXPLORER_FWD then
-		member_chosen = GREEN
-	elseif  (colors == {color1 = BLUE,color2 = GREEN} or colors == {color1 = GREEN,color2 = BLUE}) 
-	and current_substate == EXPLORER_BWD then
-		member_chosen = BLUE
+		if current_substate == EXPLORER_FWD then
 
-	elseif  (colors == {color1 = GREEN,color2 = RED} or colors == {color1 = RED,color2 = GREEN}) 
-	and current_substate == EXPLORER_FWD then
-		member_chosen = RED
-	elseif  (colors == {color1 = GREEN,color2 = RED} or colors == {color1 = RED,color2 = GREEN})
-   and current_substate == EXPLORER_BWD then
-		member_chosen = GREEN
+		member_chosen.color = info.color1
+		member_chosen.distance = info.d1
+		member_chosen.angle = info.angle1
 
-	elseif  (colors == {color1 = RED,color2 = BLUE} or colors == {color1 = BLUE,color2 = RED}) 
-	and current_substate == EXPLORER_FWD then
-		member_chosen = BLUE
-	elseif  (colors == {color1 = RED,color2 = BLUE} or colors == {color1 = BLUE,color2 = RED}) 
-	and current_substate == EXPLORER_BWD then
-		member_chosen = RED
+		elseif current_substate == EXPLORER_BWD then
+		member_chosen.color = info.color2 
+		member_chosen.distance = info.d2
+		member_chosen.angle = info.angle2
+		end
+
+	elseif info.color1 == GREEN and info.color2 == BLUE
+	or info.color1 == RED and info.color2 == GREEN
+	or info.color1 == BLUE and info.color2 == RED then
+
+		if current_substate == EXPLORER_FWD then
+		member_chosen.color = info.color2
+		member_chosen.distance = info.d2
+		member_chosen.angle = info.angle2
+
+		elseif current_substate == EXPLORER_BWD then
+		member_chosen.color = info.color1
+		member_chosen.distance = info.d1
+		member_chosen.angle = info.angle1
+		end
+
 	end
 
-	log("Member chosen :"..number_color(member_chosen))
+	f_ad = { x=0, y=0 }
+	f_ad.x = (d_expl-member_chosen.distance) / d_camera  * math.cos(member_chosen.angle)
+	f_ad.y = (d_expl-member_chosen.distance) / d_camera  * math.sin(member_chosen.angle)
+
+	f_expl = { x=0, y=0 }
+	f_expl.x = f_ad.x
+	f_expl.y = f_ad.y
+
+	length = math.sqrt(f_expl.x * f_expl.x + f_expl.y * f_expl.y)
+	angle = math.atan2(f_expl.y, f_expl.x)
+
+	log("Final vector")
+	log("Length: "..length)
+	log("Angle: "..angle)
+
 	explore()
 end
 
 function explore()
-	-- We treat each proximity reading as a vector. The value represents the length
-	-- and the angle gives the angle of corresponding to the reading, wrt the robot's coordinate system
-	-- First, we sum all the vectors.
+
+	-- Long range
 	accumul = { x=0, y=0 }
-	for i = 1, 24 do 
-		-- we calculate the x and y components given length and angle
-		vec = {
-			x = robot.proximity[i].value * math.cos(robot.proximity[i].angle),
-			y = robot.proximity[i].value * math.sin(robot.proximity[i].angle)
+	local data = table.copy(robot.distance_scanner.long_range)
+    for i=1,#robot.distance_scanner.long_range do
+		local vec = {
+			x = data[i].distance * math.cos(data[i].angle),
+			y = data[i].distance * math.sin(data[i].angle)
 		}
-		-- we sum the vectors into a variable called accumul
 		accumul.x = accumul.x + vec.x
 		accumul.y = accumul.y + vec.y
-	end
-	-- we get length and angle of the final sum vector
+    end
+
 	length = math.sqrt(accumul.x * accumul.x + accumul.y * accumul.y)
 	angle = math.atan2(accumul.y, accumul.x)
 
@@ -392,12 +454,14 @@ function explore()
 		-- We turn with a speed that depends on the angle. The closer the obstacle to the x axis
 		-- of the robot, the quicker the turn
 		if angle > 0 then
-			robot.wheels.set_velocity(math.max(0.5,math.cos(angle)) * 5,0)
+			robot.wheels.set_velocity(math.max(0.5,math.cos(angle)) * 10,0)
 		else
-			robot.wheels.set_velocity(0, math.max(0.5,math.cos(angle)) * 5)	
+			robot.wheels.set_velocity(0, math.max(0.5,math.cos(angle)) * 10)	
 		end
 	else 
 			-- No obstacle. We go straight
-			robot.wheels.set_velocity(5,5)
+			robot.wheels.set_velocity(10,10)
 	end
 end
+
+
