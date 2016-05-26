@@ -9,17 +9,21 @@ local range_and_bearing = require("range_and_bearing")
 
 local logs={}
 
+---------------------------------------------------------------------------
 -- Writing in the logs
 function logs.write()
 	log("Robot ID : "..robot.id)
-	log("State : "..convert.number_state(current_substate))
+	log("State : "..convert.number_state(current_state))
+	log("Color : "..convert.number_color(current_color))
 	log("Explorers robots detected : "..range_and_bearing.robot_detected(EXPLORER))
 	log("Chain members robots detected : "..range_and_bearing.robot_detected(CHAIN_MEMBER))
 	log("Lost robots detected : "..range_and_bearing.robot_detected(LOST))
 	logs.robot_detected()
 	log("-------------------------------")
 end
+---------------------------------------------------------------------------
 
+---------------------------------------------------------------------------
 -- Write useful informations about detected robots
 function logs.robot_detected()
 	local sort_data = table.copy(robot.range_and_bearing)
@@ -33,5 +37,6 @@ function logs.robot_detected()
 		)
 	end
 end
+---------------------------------------------------------------------------
 
 return logs

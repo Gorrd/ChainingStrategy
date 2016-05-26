@@ -2,68 +2,100 @@
 -- 													EXPLORER FUNCTIONS
 ------------------------------------------------------------------------------------------------------
 
+--[[
+           
+          o-> 
+
+      o
+     / 
+    o 
+     \   
+      o 
+     /  
+    o 
+
+When the experiment begins, all robots are on explorer state on the nest. Their goal is to find a chain
+and expend it. They can move along a chain to go quicker to the unexplored areas and search for black spot.
+They are also able to create a new chain.
+]]
+
 local range_and_bearing = require("range_and_bearing")
+local convert = require("convert")
 
 local explorer={}
 
--- What the robot does when it is explorating his environment
+---------------------------------------------------------------------------
+-- Main function
 function explorer.behavior()
-	robot.leds.set_all_colors("white")
+	robot.leds.set_all_colors("black")
+	robot.in_chain = 0
 
 	-- Start condition : robot is not on nest, no chain detected
 	-- Time create a new chain !
-	-- Delay is added to prevent the chain to start too close from the nest
-	if current_substate == EXPLORER_FWD
-	and not(explorer.isOnNest())
+	-- Delay is added to prevent the chain to begin too close from the nest
+	if not(range_and_bearing.isOnNest())
 	and range_and_bearing.robot_detected(CHAIN_MEMBER) == 0 then
 		if current_transition_steps == -1 then
-			current_transition_steps = robot.random.uniform_int(10,30)
+			current_transition_steps = 100
 		end
 		if current_transition_steps == 0 then
 			current_state = CHAIN_MEMBER
-			current_substate = CHAIN_MEMBER_LAST
 			range_and_bearing.set_color_chain()
 			current_transition_steps = -1
 		else
 			current_transition_steps = current_transition_steps - 1
 		end
-
+	end
+	
 	-- The explorer senses one chain member and is not on the nest. 
 	-- A probabilistic event will trigger the aggregation of the robot to the chain.
-	elseif current_substate == EXPLORER_FWD
-	and range_and_bearing.robot_detected(CHAIN_MEMBER) == 1
-	and robot.random.bernoulli(p_expl_chain) == 1 
-	and not(explorer.isOnNest()) then
+	if range_and_bearing.robot_detected(CHAIN_MEMBER) == 1
+	and robot.random.bernoulli(p_expl_chain)
+	and not(range_and_bearing.isOnNest())
+	and not(range_and_bearing.nest_detected()) then
 		current_state = CHAIN_MEMBER
-		current_substate = CHAIN_MEMBER_LAST
 		range_and_bearing.set_color_chain()
-
-	-- The explorer senses two chain members or more. It will follow one chain member based on his substate until
+    
+    -- The explorer senses one chain member and is on the nest. The chain member attracts
+    -- the explorer, allowing it to leave the nest.
+	elseif range_and_bearing.robot_detected(CHAIN_MEMBER) == 1
+	and range_and_bearing.isOnNest() then
+        explorer.explore()
+        
+	-- The explorer senses two chain members or more. It will follow one chain member until
 	-- it detects only one chain member.
-	elseif range_and_bearing.robot_detected(CHAIN_MEMBER) >= 2 then
-		explorer.move_along_chain()
-
-	-- The backward explorer founds the nest and is ready to go on
-	elseif current_substate == EXPLORER_BWD
-	and explorer.isOnNest() then
-		current_substate = EXPLORER_FWD
-
+	elseif range_and_bearing.robot_detected(CHAIN_MEMBER) >= 2 
+	and not(range_and_bearing.isOnNest())
+	and not(last_chain_member_found) then
+	    explorer.move_along_chain()
+	
+	-- Target found    
+	elseif range_and_bearing.isOnTarget() then
+	    robot.wheels.set_velocity(0,0)
+        current_state = TARGET
+        current_color = NONE
+        robot.leds.set_all_colors("black")
+        
 	-- The robot explores
 	else
 		explorer.explore()
 	end
+	
 end
+---------------------------------------------------------------------------
 
+---------------------------------------------------------------------------
 -- The explorer moves along the chain he found.
 function explorer.move_along_chain()
 	
 	-- Selection of the chain member to follow
 	info = range_and_bearing.two_closest_chain_members() -- Informations of the two closest chain members
-	member_chosen = {color=NONE, distance=0, angle=0}
-
+	member_chosen = {color=NONE, d=0, angle=0}
+    
+    -- Same color of the two chain members : we chose the closest
 	if info.color1 == info.color2 then
-		member_chosen.color = info.color1 
-		member_chosen.distance = info.d1 
+		member_chosen.color = info.color1
+		member_chosen.d = info.d1
 		member_chosen.angle = info.angle1
 	end
 	
@@ -71,85 +103,76 @@ function explorer.move_along_chain()
 	or info.color1 == GREEN and info.color2 == RED
 	or info.color1 == RED and info.color2 == BLUE then
 
-		if current_substate == EXPLORER_FWD then
-
-		member_chosen.color = info.color1
-		member_chosen.distance = info.d1
-		member_chosen.angle = info.angle1
-
-		elseif current_substate == EXPLORER_BWD then
-		member_chosen.color = info.color2 
-		member_chosen.distance = info.d2
+	    member_chosen.color = info.color2
+		member_chosen.d = info.d2
 		member_chosen.angle = info.angle2
-		end
 
 	elseif info.color1 == GREEN and info.color2 == BLUE
 	or info.color1 == RED and info.color2 == GREEN
 	or info.color1 == BLUE and info.color2 == RED then
 
-		if current_substate == EXPLORER_FWD then
-		member_chosen.color = info.color2
-		member_chosen.distance = info.d2
-		member_chosen.angle = info.angle2
-
-		elseif current_substate == EXPLORER_BWD then
 		member_chosen.color = info.color1
-		member_chosen.distance = info.d1
+		member_chosen.d = info.d1
 		member_chosen.angle = info.angle1
-		end
 
 	end
-
-    -- Adjust distance
-	F_ad = { x=0, y=0 }
-	F_ad.x = (d_expl-member_chosen.distance) / d_camera  * math.cos(member_chosen.angle)
-	F_ad.y = (d_expl-member_chosen.distance) / d_camera  * math.sin(member_chosen.angle)
 	
-	-- Move perpendicular
-	F_mp = { x=0, y=0 }
-	F_mp.x = - math.sin(member_chosen.angle)
-    F_mp.y = math.cos(member_chosen.angle)
-    
-    -- Avoid collisions
-    F_ac = { x=0, y=0 }
-    for i = 1, 24 do 
-        vec = {
-			x = robot.proximity[i].value * math.cos(robot.proximity[i].angle),
-			y = robot.proximity[i].value * math.sin(robot.proximity[i].angle)
-		}
-		F_ac.x = F_ac.x + vec.x
-		F_ac.y = F_ac.y + vec.y
-	end
-    
-	F_expl = { x=0, y=0 }
-	F_expl.x = 5*F_ad.x + F_mp.x + F_ac.x
-	F_expl.y = 5*F_ad.y + F_mp.y + F_ac.y
-
-	length = math.sqrt(F_expl.x * F_expl.x + F_expl.y * F_expl.y)
-	angle = math.atan2(F_expl.y, F_expl.x)
-	
-	-- Low level motor control
-	lSpeed = 0
-	rSpeed = 0
-	
-	if angle >= 0 and angle < math.pi/2 then
-	    lSpeed = math.cos(2*angle)
-	    rSpeed = 10
-	elseif angle >= math.pi/2 and angle < math.pi then
-		lSpeed = math.cos(2*angle - math.pi)
-	    rSpeed = -10
-	elseif angle >= math.pi and angle < 3*math.pi/2 then
-		lSpeed = -10
-	    rSpeed = - math.cos(2*angle)
-	elseif angle >= 3*math.pi/2 and angle < 2*math.pi then
-		lSpeed = 10
-	    rSpeed = - math.cos(2*angle - math.pi)
-	else
-	    lSpeed = 10
-	    rSpeed = 10
+	if member_chosen.d <= d_expl then
+	    last_chain_member_found = true
 	end
 	
-	robot.wheels.set_velocity(math.min(length,10)*lSpeed,math.min(length,10)*rSpeed)
+	if not(last_chain_member_found) then
+	    target_angle = explorer.ProcessRAB_LJ(member_chosen) 
+	    speeds = explorer.ComputeSpeedFromAngle(target_angle)
+        robot.wheels.set_velocity(speeds[1],speeds[2]) 
+    end
+end
+
+---------------------------------------------------------------------------
+-- In this function, we take all distances of the other robots and apply the lennard-jones potential.
+-- We then sum all these vectors to obtain the final angle to follow in order to go to the place with the minimal potential
+function explorer.ProcessRAB_LJ(target_robot)
+
+   sum_vector = {0,0}
+   lj_value = explorer.ComputeLennardJones(target_robot.d,d_expl) -- compute the lennard-jones value
+   sum_vector[1] = math.cos(target_robot.angle)*lj_value -- sum the x components of the vectors
+   sum_vector[2] = math.sin(target_robot.angle)*lj_value -- sum the y components of the vectors
+
+   desired_angle = math.atan2(sum_vector[2],sum_vector[1]) -- compute the angle from the vector
+   return desired_angle
+end
+---------------------------------------------------------------------------
+
+---------------------------------------------------------------------------
+-- This function take the distance and compute the lennard-jones potential.
+-- The parameters are defined at the top of the script
+function explorer.ComputeLennardJones(distance,target_dist)
+   return -(4*EPSILON/distance * (math.pow(target_dist/distance,4) - math.pow(target_dist/distance,2)));
+end
+---------------------------------------------------------------------------
+
+--This function computes the necessary wheel speed to go in the direction of the desired angle.
+function explorer.ComputeSpeedFromAngle(angle)
+    dotProduct = 0.0;
+    KProp = 20;
+    wheelsDistance = 0.14;
+
+    -- if the target angle is behind the robot, we just rotate, no forward motion
+    if angle > math.pi/2 or angle < -math.pi/2 then
+        dotProduct = 0.0;
+    else
+    -- else, we compute the projection of the forward motion vector with the desired angle
+        forwardVector = {math.cos(0), math.sin(0)}
+        targetVector = {math.cos(angle), math.sin(angle)}
+        dotProduct = forwardVector[1]*targetVector[1]+forwardVector[2]*targetVector[2]
+    end
+
+	 -- the angular velocity component is the desired angle scaled linearly
+    angularVelocity = KProp * angle;
+    -- the final wheel speeds are compute combining the forward and angular velocities, with different signs for the left and right wheel.
+    speeds = {dotProduct * WHEELS_SPEED - angularVelocity * wheelsDistance, dotProduct * WHEELS_SPEED + angularVelocity * wheelsDistance}
+
+    return speeds
 end
 
 function explorer.explore()
@@ -197,25 +220,19 @@ function explorer.explore()
 		-- We turn with a speed that depends on the angle. The closer the obstacle to the x axis
 		-- of the robot, the quicker the turn
 		if angle > 0 then
-			robot.wheels.set_velocity(math.max(0.5,math.cos(angle)) * 10,0)
+			robot.wheels.set_velocity(math.max(0.5,math.cos(angle)) * WHEELS_SPEED, 0)
 		else
-			robot.wheels.set_velocity(0, math.max(0.5,math.cos(angle)) * 10)	
+			robot.wheels.set_velocity(0, math.max(0.5,math.cos(angle)) * WHEELS_SPEED)	
 		end
 	else 
 			-- No obstacle. We go straight
-			robot.wheels.set_velocity(10,10)
+			robot.wheels.set_velocity(WHEELS_SPEED,WHEELS_SPEED)
 	end
 end
 
--- Sense if the robot is on the nest based on the color's floor
-function explorer.isOnNest()
-	local sort_ground = table.copy(robot.motor_ground)
-   table.sort(sort_ground, function(a,b) return a.value<b.value end)
-	if round(sort_ground[1].value,2) == 0.9 then
-		return true
-	else
-		return false
-	end
+function emit_data()
+	robot.range_and_bearing.set_data(1,current_state)
+	robot.range_and_bearing.set_data(2,current_color)  
 end
 
 
