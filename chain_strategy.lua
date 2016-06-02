@@ -8,55 +8,30 @@ in each location.
 --									    GLOBAL VARIABLES
 ------------------------------------------------------------------------------------------------------
 -- States
--- EXPLORER state
--- Move around the nest searching for chains, then navigates along a chain to explore the environment.
-EXPLORER = 1
-
--- CHAIN_MEMBER state
--- Activates when a robot is aggregated into a chain.
-CHAIN_MEMBER = 2
-
--- TARGET state
--- The robot is on the black spot and doesnt move anymore.
-TARGET = 3
-
--- The robots are all initialized in this state to explore the nest and try to leave it.
-current_state = EXPLORER
-
--- Probabilities of some state's transition
-
-p_expl_chain = 0.1 -- Exploration -> Chain member
-p_chain_expl = 1-p_expl_chain -- Chain member -> Exploration
-
--- Count how many steps left for the robot's transition
-current_transition_steps = -1
-long_range_steps = 0
-
--- If the explorer found the last member of the chain
-last_chain_member_found = false
-
--- Counter for merge behavior
-merged_steps = 0
-
--- When a close obstacle is sensed, the collision behavior is executed prior to others
-avoid_collision = false
-
+EXPLORER = 0
+CHAIN_MEMBER = 1
+TARGET = 2
+NEST = 3
 
 -- Colors to give information about the robot's location in the chain
 NONE = 0
 BLUE = 1
 GREEN = 2
 RED = 3
-current_color = 0
+
+-- The robots are all initialized in this state to explore the nest and try to leave it.
+current_state = NEST
+current_color = NONE
 
 -- Variables for the experiment
+WHEELS_SPEED = 40
+d_camera = 300
+d_chain = 150
+d_expl = 70
+d_merge = 20
 
-d_expl = 50 -- desired distance between an explorer and his chosen chain-member
-d_camera = 200 -- camera sensing range
-d_merge = 30 -- distance threshold for two chain-members to merge into one
-d_chain = 200 -- the target distance between robots, in cm
-EPSILON = 50 -- a coefficient to increase the force of the repulsion/attraction function
-WHEELS_SPEED = 40 -- Speed of the wheels
+-- Variable for transition
+wait_time = 0
 
 ------------------------------------------------------------------------------------------------------
 --										    HELPFUL FUNCTIONS
@@ -79,30 +54,27 @@ end
 
 -- Load others lua files
 local range_and_bearing = require("range_and_bearing")
-local logs = require("logs")
 local explorer = require("explorer")
 local chain_member = require("chain_member")
-
+local target = require("target")
+local nest = require("nest")
 ------------------------------------------------------------------------------------------------------
 --										    MAIN PROGRAM
 ------------------------------------------------------------------------------------------------------
 
 function init()
-	current_state = EXPLORER
-	current_color = NONE
+	current_state = NEST
+	robot.leds.set_all_colors("yellow")
 	range_and_bearing.emit_data()
-	robot.in_chain = 0
 	robot.distance_scanner.enable()
-	current_transition_steps = -1
-   long_range_steps = 0
-	merge_steps = robot.random.uniform_int(1,20)
+   wait_time = 0
+   robot.in_chain = 0
 end
 
 function step()
 
 	-- Distance scanner rotation
-	robot.distance_scanner.set_rpm(30/math.pi)
-
+	robot.distance_scanner.set_rpm(200)
 	-- Emission of the several data
 	range_and_bearing.emit_data()
 
@@ -111,30 +83,53 @@ function step()
 		explorer.behavior()
 	   
 	elseif current_state == CHAIN_MEMBER then
-	   chain_member.behavior()
+        chain_member.behavior()
 
 	elseif current_state == TARGET then
-		-- Nothing to do.
+        target.behavior()
+
+	elseif current_state == NEST then
+		  nest.behavior()
 	end
 	
 end
 
 -- Should be the same as init
 function reset()
-	current_state = EXPLORER
-	current_color = NONE
+	current_state = NEST
+	robot.leds.set_all_colors("yellow")
 	range_and_bearing.emit_data()
-	robot.in_chain = 0
 	robot.distance_scanner.enable()
-	current_transition_steps = -1
-   long_range_steps = 0
-	merge_steps = robot.random.uniform_int(1,20)
+   wait_time = 0
+   robot.in_chain = 0
 end
 
 function destroy()
 end
 
+function transition(state)
+	 wait_time = robot.random.uniform_int(1,10)
 
-------------------------------------------------------------------------------------------------------
+	 if state == NEST then
+		current_state = NEST
+		robot.leds.set_all_colors("yellow")
+	 end
 
+    if state == CHAIN_MEMBER then
+        current_state = CHAIN_MEMBER
+		 robot.in_chain = 1
+        range_and_bearing.set_color_chain()
+    end
 
+    if state == EXPLORER then
+        current_state = EXPLORER
+        current_color = NONE
+		  robot.in_chain = 0
+		  robot.leds.set_all_colors("black")
+    end
+    
+    if state == TARGET then
+        current_state = TARGET
+        current_color = NONE
+    end
+end

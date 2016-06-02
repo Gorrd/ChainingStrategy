@@ -1,4 +1,4 @@
-# Install script for directory: /home/gorrd/Swarm Intelligence/INFO-H-414-SR-2016/src
+# Install script for directory: /home/gorrd/ChainingStrategy/src
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -40,5 +40,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/gorrd/Swarm Intelligence/INFO-H-414-SR-2016/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/gorrd/ChainingStrategy/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

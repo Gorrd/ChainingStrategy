@@ -6,13 +6,13 @@
 
 #IncludeRegexTransform: 
 
-/home/gorrd/Swarm Intelligence/INFO-H-414-SR-2016/src/landmarks.cpp
+/home/gorrd/ChainingStrategy/src/landmarks.cpp
 landmarks.h
-/home/gorrd/Swarm Intelligence/INFO-H-414-SR-2016/src/landmarks.h
+/home/gorrd/ChainingStrategy/src/landmarks.h
 argos3/core/wrappers/lua/lua_controller.h
 -
 
-/home/gorrd/Swarm Intelligence/INFO-H-414-SR-2016/src/landmarks.h
+/home/gorrd/ChainingStrategy/src/landmarks.h
 argos3/core/simulator/loop_functions.h
 -
 argos3/plugins/robots/foot-bot/simulator/footbot_entity.h
