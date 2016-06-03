@@ -13,7 +13,7 @@ CHAIN_MEMBER = 1
 TARGET = 2
 NEST = 3
 
--- Colors to give information about the robot's location in the chain
+-- Colors to give information about the robot's location in the chain.
 NONE = 0
 BLUE = 1
 GREEN = 2
@@ -25,10 +25,11 @@ current_color = NONE
 
 -- Variables for the experiment
 WHEELS_SPEED = 40
-d_camera = 300
-d_chain = 150
+d_camera = 300 -- To modify !!
+d_chain = 150 
 d_expl = 70
 d_merge = 20
+n_robots = 25 -- To modify !!
 
 -- Variable for transition
 wait_time = 0
@@ -107,6 +108,7 @@ end
 function destroy()
 end
 
+-- Transition function, wait time is added
 function transition(state)
 	 wait_time = robot.random.uniform_int(1,10)
 

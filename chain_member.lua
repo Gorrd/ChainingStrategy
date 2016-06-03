@@ -33,6 +33,8 @@ function chain_member.behavior()
     else
         robot.wheels.set_velocity(0,0)
         
+        -- When the chain member detects nothing, it goes on exploration. If 
+        -- this condition is triggered it means the robot is close to a target spot.
         if range_and_bearing.robot_detected(CHAIN_MEMBER) == 0 
         and range_and_bearing.robot_detected(EXPLORER) == 0 then 
             explorer.explore()

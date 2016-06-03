@@ -14,8 +14,8 @@
      /  
     o 
 
-When the experiment begins, all robots are on explorer state on the nest. Their goal is to find a chain
-and expend it. They can move along a chain to go quicker to the unexplored areas and search for black spot.
+Their goal is to find a chain and expend it. T
+They can move along a chain to go quicker to the unexplored areas and search for black spot.
 They are also able to create a new chain.
 ]]
 

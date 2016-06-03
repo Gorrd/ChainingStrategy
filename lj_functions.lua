@@ -1,11 +1,17 @@
+------------------------------------------------------------------------------------------------------
+-- 													LENNARD JONES FUNCTIONS
+------------------------------------------------------------------------------------------------------
 
+-- To help the robots to try to position themselves, we use the Lennard-Jones potential. The trick is
+-- to play with the differents distances to make attraction between robots or attraction to free zones
+-- for example.
 
 local lj_functions = {}
 
 local range_and_bearing = require("range_and_bearing")
 
-
---This function computes the necessary wheel speed to go in the direction of the desired angle
+---------------------------------------------------------------------------
+--This function computes the necessary wheel speed to go in the direction of the desired angle.
 function lj_functions.compute_SpeedFromAngle(angle)
     dotProduct = 0.0;
     KProp = 20;
@@ -29,13 +35,12 @@ function lj_functions.compute_SpeedFromAngle(angle)
     return speeds
 end
 
--- This function take the distance and compute the lennard-jones potential
+-- This function take the distance and compute the lennard-jones potential.
 function lj_functions.compute_LennardJones(distance,target_dist,eps)
    return -(4*eps/distance * (math.pow(target_dist/distance,4) - math.pow(target_dist/distance,2)))
 end
 
 ---------------------------------------------------------------------------
-
 -- Detect short range obstacles and return a vector to avoid them.
 function short_range(factor)
     local vector = {0,0}
@@ -52,10 +57,12 @@ function short_range(factor)
     
     return vector
 end
+---------------------------------------------------------------------------
 
+---------------------------------------------------------------------------
 -- Detect free zones and return a vector to go to them.
 -- We say that a scanner detects a free zone when the distance is -2 (means nothing is detected)
--- and we only use the frontal sensors ( -1 < angle < 1)
+-- and we only use the frontal sensors ( -1 < angle < 1).
 function attraction_free_zones(factor)
     local vector = {0,0}
 	local data_long = table.copy(robot.distance_scanner.long_range)
@@ -87,36 +94,11 @@ function long_range(factor)
     
     return vector
 end
-                                       
-function center(factor)
-    local data_long = table.copy(robot.distance_scanner.long_range)
-    local vector = {0,0}  
-    local mean_dist = 0
-    local n = 0
-                                       
-	for i=1,#data_long do
-		if data_long[i].distance >= 0 then
-			mean_dist = mean_dist + data_long[i].distance
-            n = n + 1
-		end
-    end  
-                                       
-    mean_dist = mean_dist / n
-                                       
-	for i=1,#data_long do
-		if data_long[i].distance >= 0 then
-			local lj_value = lj_functions.compute_LennardJones(data_long[i].distance, mean_dist, 50)
-			vector[1] = vector[1] + factor * math.cos(data_long[i].angle) * lj_value
-			vector[2] = vector[2] + factor * math.sin(data_long[i].angle) * lj_value
-		end
-    end
-    
-    return vector
-end                                      
-        
 ---------------------------------------------------------------------------
-
-
+ 
+---------------------------------------------------------------------------
+-- Sum all top behaviors to create a exploration process which returns a
+-- vector. The robot goes where nothing is on the way and avoid obstacles.                                       
 function lj_functions.process_exploration()
     -- Variables
     local vector = {0,0}
@@ -125,7 +107,12 @@ function lj_functions.process_exploration()
     vector[2] = short_range(10)[2] + attraction_free_zones(50)[2] + long_range(1)[2]
     return vector
 end
-
+---------------------------------------------------------------------------
+                                       
+---------------------------------------------------------------------------
+-- The chain member adjusts his distance with his predecessor in the chain. If the
+-- distance between the two of them is close enough (controlled by a threshhold theta)
+-- the distance is seen as enough.
 function lj_functions.process_adjust()
     local vector = {0,0}
     previous = range_and_bearing.close_chain_member("previous")
@@ -144,7 +131,10 @@ function lj_functions.process_adjust()
 
     return vector
 end
+---------------------------------------------------------------------------
                                        
+---------------------------------------------------------------------------
+-- When two robots of the same color detect each other, they are attracted.                                       
 function lj_functions.process_merge()
     
     local vector = {0,0}
@@ -163,7 +153,11 @@ function lj_functions.process_merge()
     
     return vector
 end
-
+---------------------------------------------------------------------------
+                                       
+---------------------------------------------------------------------------
+-- The robot goes to the targeted robot, with respect to obstacles and will try
+-- to go where nothing is on the way.
 function lj_functions.process_goto(target_robot)
     
     local vector = {0,0}

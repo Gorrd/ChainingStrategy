@@ -75,7 +75,7 @@ end
 ---------------------------------------------------------------------------
 
 ---------------------------------------------------------------------------
-        
+-- Detect the next or previous chain member.
 function range_and_bearing.close_chain_member_detected(side)
     
     local sort_data = table.copy(robot.range_and_bearing)
@@ -114,6 +114,7 @@ end
 
 ---------------------------------------------------------------------------
 
+-- Return the next or previous chain member informations.
 function range_and_bearing.close_chain_member(side)
     
     -- Data
@@ -241,7 +242,7 @@ function range_and_bearing.closest_chain_member()
 end
 ---------------------------------------------------------------------------
 
--- Sense if the robot is on the nest based on the color's floor
+-- Sense if the robot is on the nest based on the color's floor.
 function range_and_bearing.isOnNest()
 	local sort_ground = table.copy(robot.motor_ground)
    table.sort(sort_ground, function(a,b) return a.value<b.value end)
@@ -252,7 +253,7 @@ function range_and_bearing.isOnNest()
 	end
 end
 
--- Sense if the robot is on the target
+-- Sense if the robot is on the target.
 function range_and_bearing.isOnTarget()
 	local sort_ground = table.copy(robot.motor_ground)
    table.sort(sort_ground, function(a,b) return a.value<b.value end)
