@@ -44,16 +44,19 @@ function chain_member.behavior()
         if range_and_bearing.isOnNest() then
             transition(EXPLORER)
         end
-    
+        
+        -- Target check
         if range_and_bearing.isOnTarget() 
         and range_and_bearing.robot_detected(TARGET) == 0 then
             transition(TARGET)
         end
-    
+        
+        -- Adjust distance with the previous member of the chain
         if range_and_bearing.close_chain_member_detected("previous") then
             adjust_distance()
         end
-    
+        
+        -- Merge with the same chain member
         if range_and_bearing.same_chain_member_detected() then
             merge()
         end

@@ -27,12 +27,13 @@ function range_and_bearing.emit_data()
 end
 ---------------------------------------------------------------------------
 
+-- Compute the color of the new chain member based on the closest chain member detected
 ---------------------------------------------------------------------------
 function range_and_bearing.set_color_chain()
     local sort_data = table.copy(robot.range_and_bearing)
     table.sort(sort_data, function(a,b) return a.range<b.range end)
     
-    -- Aucun robot dÃ©tectÃ©
+    -- No robots detected
     if range_and_bearing.robot_detected(CHAIN_MEMBER) == 0 then
         robot.leds.set_all_colors("blue")
         current_color = BLUE  
@@ -223,30 +224,12 @@ end
 ---------------------------------------------------------------------------
 
 ---------------------------------------------------------------------------
--- Find the closest chain member and return its informations.
-function range_and_bearing.closest_chain_member()
-	local sort_data = table.copy(robot.range_and_bearing)
-	local info = {color = NONE, d = 0, angle = 0 }
-	table.sort(sort_data, function(a,b) return a.range<b.range end)
-	local count = 0
-	
-	for i = 1,#robot.range_and_bearing do
-		if sort_data[i].data[1] == CHAIN_MEMBER and sort_data[i].range < d_camera then -- Chain member found
-				info.color = sort_data[i].data[2]
-				info.d = sort_data[i].range
-				info.angle = sort_data[i].horizontal_bearing
-		end
-	end
-	
-	return info
-end
----------------------------------------------------------------------------
 
 -- Sense if the robot is on the nest based on the color's floor.
 function range_and_bearing.isOnNest()
 	local sort_ground = table.copy(robot.motor_ground)
    table.sort(sort_ground, function(a,b) return a.value<b.value end)
-	if round(sort_ground[1].value,2) == 0.9 then
+	if round(sort_ground[1].value,2) == 0.9 then -- grey
 		return true
 	else
 		return false
@@ -258,7 +241,7 @@ function range_and_bearing.isOnTarget()
 	local sort_ground = table.copy(robot.motor_ground)
    table.sort(sort_ground, function(a,b) return a.value<b.value end)
    for i=1,#sort_ground do
-	    if sort_ground[i].value ~= 0 then
+	    if sort_ground[i].value ~= 0 then -- black 
 		    return false
 	    end
    end

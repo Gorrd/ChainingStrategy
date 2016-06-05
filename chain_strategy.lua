@@ -29,7 +29,7 @@ d_camera = 300 -- To modify !!
 d_chain = 150 
 d_expl = 70
 d_merge = 20
-n_robots = 25 -- To modify !!
+n_robots = 20 -- To modify !!
 
 -- Variable for transition
 wait_time = 0
@@ -92,7 +92,6 @@ function step()
 	elseif current_state == NEST then
 		  nest.behavior()
 	end
-	
 end
 
 -- Should be the same as init
